@@ -1,0 +1,48 @@
+
+target name: 'LZR.E98.1601A.B83.WA'
+target description: 'Room S21 Rack S1 PDU A Power Circuit A'
+
+==================================================
+
+default_interval: 5
+
+default_prefix: 'LZR.E98'
+
+default_objects: ['default_objects']
+
+additional_metric_attributes: ['room', 'rack', 'unit']
+
+snmp_object_collections:
+   default_objects:
+     '.1.3.6.1.4.1.476.1.42.3.8.30.40.1.63.1.1.1': 
+        suffix : 'B83.W1'
+        unit : 'W'
+        description : 'Power Phase 1'
+     '.1.3.6.1.4.1.476.1.42.3.8.30.40.1.63.1.1.1': 
+        suffix : 'B83.WA'
+        unit : 'W'
+        description : 'Power Circuit A'
+
+   temperature_sensor:
+     '.1.3.6.1.4.1.476.1.42.3.8.60.15.1.70.1.1.1': 
+        suffix : 'B30'
+	unit : 'degC'
+	description : 'Temperature'
+        interval : 60	
+
+hosts:
+   '172.30.144.11':
+       name: 'LZR-P70-S21-S1-L'
+       room: 'S21'
+       rack: 'S1'
+       infix: '2101A'
+       description: 'Room S21 Rack S1 PDU A'
+       objects: ['default_objects', 'temperature_sensor']
+
+
+=====================
+- target name: "{prefix if set on host else default_prefix}.{infix}.{suffix}"
+- description is concatenated from host, object (with space)
+- additional_metric_attributes are added to declare dict, object value overwrites host attribute if key is defined at both
+- interval can be overwritten on host or object (object level takes precedence)
+
