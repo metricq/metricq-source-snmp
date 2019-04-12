@@ -12,7 +12,7 @@ import click
 import click_log
 import aiomonitor
 import metricq
-from pysnmp.hlapi.asyncio import getCmd, ObjectType, ObjectIdentity, CommunityData, ContextData, SnmpEngine
+from pysnmp.hlapi.asyncio import getCmd, ObjectType, ObjectIdentity, CommunityData, ContextData, SnmpEngine, UdpTransportTarget
 from metricq.logging import get_logger
 from config import server, token
 
@@ -167,21 +167,20 @@ class PduSource(metricq.IntervalSource):
 
     async def update(self):
         send_metrics = []
-        print(time.time(), self.result_queue.qsize())
+        #print(time.time(), self.result_queue.qsize())
         while True:
             try:
                 result_list = self.result_queue.get_nowait()
                 for metric_name, ts, value in result_list:
-                    name = "LZR.E98.{}".format(metric_name)
-                    print(name, ts, value)
-                    send_metrics.append(self[name].send(ts, value))
+                    #print(metric_name, ts, value)
+                    send_metrics.append(self[metric_name].send(ts, value))
             except Empty:
                 break
-
-        print(time.time(), "Count: {}".format(len(send_metrics)))
+        ts_before = time.time()
         if send_metrics:
             await asyncio.wait(send_metrics)
-        print(time.time())
+        print("Send took {:.2f} seconds, count: {}".format(
+            time.time() - ts_before, len(send_metrics)))
 
 
 @click.command()
