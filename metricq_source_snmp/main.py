@@ -74,7 +74,7 @@ async def collect_periodically(work, result_queue):
                                    community_string, objects))
 
         ret = await asyncio.gather(*get_data)
-        #print("Worker putting {} PDU results into queue...".format(len(ret)))
+        #print("Worker putting {} results into queue...".format(len(ret)))
         for r in ret:
             if r:
                 result_queue.put_nowait(r)
