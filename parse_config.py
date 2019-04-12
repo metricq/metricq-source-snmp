@@ -1,9 +1,10 @@
 settings = {
-  'default_interval': 5,
-  'default_prefix': 'LZR.E98',
-  'default_objects_collection': ['default_objects'],
-  'additional_metric_attributes': ['room', 'rack', 'unit'],
-  'snmp_object_collections': {
+   'default_community': 'pdumon',
+   'default_interval': 5,
+   'default_prefix': 'LZR.E98',
+   'default_object_collections': ['default_objects'],
+   'additional_metric_attributes': ['room', 'rack', 'unit'],
+   'snmp_object_collections': {
       'default_objects': {
          '.1.3.6.1.4.1.476.1.42.3.8.30.40.1.63.1.1.1': {  # power pro Phase
             'suffix': 'B83.W1',
