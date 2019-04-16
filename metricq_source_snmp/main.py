@@ -16,8 +16,6 @@ from pysnmp.hlapi.asyncio import getCmd, ObjectType, ObjectIdentity, CommunityDa
 from metricq.logging import get_logger
 from config import server, token
 
-INTERVAL = 5
-
 logger = get_logger()
 click_log.basic_config(logger)
 logger.setLevel('ERROR')
