@@ -15,7 +15,6 @@ import aiomonitor
 import metricq
 from pysnmp.hlapi.asyncio import getCmd, ObjectType, ObjectIdentity, CommunityData, ContextData, SnmpEngine, UdpTransportTarget
 from metricq.logging import get_logger
-from config import server, token
 
 logger = get_logger()
 click_log.basic_config(logger)
@@ -204,8 +203,10 @@ class PduSource(metricq.IntervalSource):
 
 
 @click.command()
+@click.option('--server', default='amqp://localhost/')
+@click.option('--token', default='source-py-snmp')
 @click_log.simple_verbosity_option(logger)
-def main():
+def run(server, token):
     global orig_sig_handler
     orig_sig_handler = signal.getsignal(signal.SIGINT)
 
@@ -215,4 +216,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run()
