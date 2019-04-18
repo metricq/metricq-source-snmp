@@ -87,7 +87,7 @@ async def collect_periodically(work, result_queue, interval):
 
 
 
-async def a_do_work(input_queue, result_queue):
+async def do_work(input_queue, result_queue):
     work = input_queue.get()
 
     sorted_work = defaultdict(list)
@@ -105,9 +105,9 @@ async def a_do_work(input_queue, result_queue):
     await asyncio.wait(work_loops)
 
 
-def do_work(input_queue, result_queue):
+def mp_worker(input_queue, result_queue):
     """init function of multiprocessing workers"""
-    asyncio.run(a_do_work(input_queue, result_queue))
+    asyncio.run(do_work(input_queue, result_queue))
 
 
 def chunks(lst, n):
@@ -176,7 +176,7 @@ class PduSource(metricq.IntervalSource):
 
         original_sigint_handler = signal.signal(
             signal.SIGINT, orig_sig_handler)
-        self.workers = mp.Pool(num_procs, do_work, (work, self.result_queue))
+        self.workers = mp.Pool(num_procs, mp_worker, (work, self.result_queue))
         signal.signal(signal.SIGINT, original_sigint_handler)
 
         # for signame in ["SIGINT", "SIGTERM"]:
