@@ -7,6 +7,7 @@ from collections import defaultdict
 import multiprocessing as mp
 from queue import Empty
 import logging
+import logging.handlers
 import signal
 import click
 import click_log
@@ -18,6 +19,8 @@ from config import server, token
 
 logger = get_logger()
 click_log.basic_config(logger)
+sh = logging.handlers.SysLogHandler(address='/dev/log')
+logger.addHandler(sh)
 logger.setLevel('ERROR')
 # Use this if we ever use threads
 # logger.handlers[0].formatter = logging.Formatter(fmt='%(asctime)s %(threadName)-16s %(levelname)-8s %(message)s')
@@ -26,7 +29,7 @@ logger.handlers[0].formatter = logging.Formatter(
 orig_sig_handler = None
 
 
-async def getone(snmp_engine, host, community_string, objects):
+async def get_one(snmp_engine, host, community_string, objects):
     objs = [ObjectType(ObjectIdentity(obj_id)) for obj_id in objects.keys()]
 
     errorIndication, errorStatus, errorIndex, varBinds = await getCmd(
@@ -38,13 +41,10 @@ async def getone(snmp_engine, host, community_string, objects):
     )
 
     if errorIndication:
-        #print(host, errorIndication)
+        logging.error(host, errorIndication)
         return
     elif errorStatus:
-        # print('%s at %s' % (
-        #    errorStatus.prettyPrint(),
-        #    errorIndex), file=sys.stderr
-        # )
+        logging.error(host, '{} at {}'.format(errorStatus.prettyPrint(), errorIndex))
         return
     else:
         ret = []
@@ -58,7 +58,7 @@ async def getone(snmp_engine, host, community_string, objects):
                 metric_name, multi, interval = objects[obj_id]
                 ret.append((metric_name, ts, float(val) * multi))
             except Exception as e:
-                #print("Invalid result from %s: %s = %s" % (host, bindName, val), file=sys.stderr)
+                logging.error(host, "Invalid result: {} = {}".format(bindName, val))
                 return []
         return ret
 
@@ -69,14 +69,14 @@ async def collect_periodically(work, result_queue, interval):
     while True:
         get_data = []
         while deadline <= time.time():
-            print('missed deadline')
+            logging.warning('missed deadline')
             deadline += interval
         sleep_var = deadline - time.time()
         await asyncio.sleep(sleep_var)
         deadline += interval
         for host, community_string, objects in work:
-            get_data.append(getone(snmp_engine, (host, 161),
-                            community_string, objects))
+            get_data.append(get_one(snmp_engine, (host, 161),
+                                    community_string, objects))
 
         ret = await asyncio.gather(*get_data)
 
@@ -89,7 +89,6 @@ async def collect_periodically(work, result_queue, interval):
 
 async def do_work(input_queue, result_queue):
     work = input_queue.get()
-
     sorted_work = defaultdict(list)
     for host, community_string, objects in work:
         sorted_objects = defaultdict(dict)
@@ -167,7 +166,7 @@ class PduSource(metricq.IntervalSource):
             work.put([(host, community_by_host[host], objects_by_host[host])
                       for host in part])
 
-        print("Starting {} worker processes...".format(num_procs))
+        logger.info("Starting {} worker processes...".format(num_procs))
         sys.stdout.flush()
 
         if self.workers:  # kill old workers if _on_config gets called multiple times:
@@ -183,7 +182,7 @@ class PduSource(metricq.IntervalSource):
         #   self.event_loop.add_signal_handler(getattr(signal, signame),
         #     functools.partial(self.on_signal, signame))
 
-        print("Declaring {} metrics...".format(len(metrics)))
+        logger.info("Declaring {} metrics...".format(len(metrics)))
         await self.declare_metrics(metrics)
 
     async def update(self):
@@ -200,7 +199,7 @@ class PduSource(metricq.IntervalSource):
         ts_before = time.time()
         if send_metrics:
             await asyncio.wait(send_metrics)
-        print("Send took {:.2f} seconds, count: {}".format(
+        logger.info("Send took {:.2f} seconds, count: {}".format(
             time.time() - ts_before, len(send_metrics)))
 
 
