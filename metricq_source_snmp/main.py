@@ -63,90 +63,51 @@ async def getone(snmp_engine, host, community_string, objects):
         return ret
 
 
-def gcd(a, b):
-    """Return greatest common divisor using Euclid's Algorithm."""
-    while b:
-        a, b = b, a % b
-    return a
-
-
-def lcm(a, b):
-    """Return lowest common multiple."""
-    return a * b // gcd(a, b)
-
-
-def lcmm(*args):
-    """Return lcm of args."""
-    return reduce(lcm, args)
-
-
-def create_time_step_list(time_list):
-    """make a list with the sleep length"""
-    round_lcm = lcmm(*time_list)  # get least common multiple
-    one_round = set()  # only unique times
-
-    for time_step in time_list:
-        one_round.update(range(0, round_lcm, time_step))  # add the times where it is called
-
-    one_round = sorted(list(one_round))
-    step_list = []
-    last_value = 0
-    for elem in one_round:
-        step_list.append(elem - last_value)  # make List with times to step List
-        last_value = elem
-    return step_list
-
-
-async def collect_periodically(work, result_queue):
+async def collect_periodically(work, result_queue, interval):
     snmp_engine = SnmpEngine()
-    time_list = []
-    for _, _, objects in work:
-        for _, _, interval in objects.values():
-            time_list.append(interval)
-
-    time_list = list(set(time_list))  # only unique intervals
-    time_step_list = create_time_step_list(time_list)
-
-    current_value = 0
-    position_step_list = 0
-    list_len = len(time_step_list)
-
+    deadline = time.time() + interval
     while True:
         get_data = []
+        while deadline <= time.time():
+            print('missed deadline')
+            deadline += interval
+        sleep_var = deadline - time.time()
+        await asyncio.sleep(sleep_var)
+        deadline += interval
         for host, community_string, objects in work:
-            needed_objects = {}
-            for obj_id, obj_data in objects.items():
-                _, _, interval = obj_data
-                if current_value % interval == 0:
-                    needed_objects[obj_id] = obj_data
+            get_data.append(getone(snmp_engine, (host, 161),
+                            community_string, objects))
 
-            if needed_objects:
-                get_data.append(getone(snmp_engine, (host, 161),
-                                       community_string, needed_objects))
-
-        before_ts = time.time()
         ret = await asyncio.gather(*get_data)
-        req_duration = time.time() - before_ts
 
         #print("Worker putting {} results into queue...".format(len(ret)))
         for r in ret:
             if r:
                 result_queue.put_nowait(r)
 
-        if position_step_list == list_len:
-            position_step_list = 0
-            current_value = 0
-
-        current_value += time_step_list[position_step_list]
-        sleep_val = max(0, time_step_list[position_step_list] - req_duration)
-        await asyncio.sleep(sleep_val)
-        position_step_list += 1
 
 
-def do_work(input_queue, result_queue):
-    """init function of multiprocessing workers"""
+async def do_work(input_queue, result_queue):
     work = input_queue.get()
-    asyncio.run(collect_periodically(work, result_queue))
+
+    sorted_work = defaultdict(list)
+    for host, community_string, objects in work:
+        sorted_objects = defaultdict(dict)
+        for obj_id, obj_data in objects.items():
+            _, _, interval = obj_data
+            sorted_objects[interval][obj_id] = obj_data
+
+        for object_interval, object_data in sorted_objects.items():
+            sorted_work[object_interval].append((host, community_string, object_data))
+    work_loops = []
+    for work_interval, work_data in sorted_work.items():
+        work_loops.append(collect_periodically(work_data, result_queue, work_interval))
+    await asyncio.wait(work_loops)
+
+
+def mp_worker(input_queue, result_queue):
+    """init function of multiprocessing workers"""
+    asyncio.run(do_work(input_queue, result_queue))
 
 
 def chunks(lst, n):
@@ -164,9 +125,7 @@ class PduSource(metricq.IntervalSource):
     @metricq.rpc_handler('config')
     async def _on_config(self, default_community, default_interval, default_prefix, default_object_collections,
                          additional_metric_attributes, snmp_object_collections, **config):
-        rate = 0.2
-        self.period = 1 / rate
-
+        self.period = default_interval
         metrics = {}  # holds metrics for declaration to metricq
 
         # key: ip, data: [(OID, metric-name, multi, interval), ...]
@@ -187,7 +146,7 @@ class PduSource(metricq.IntervalSource):
                     host_cfg['description'], obj['short_description'])
                 metric_name = "{}.{}.{}".format(
                     default_prefix, host_cfg['infix'], obj['suffix'])
-                metric = {'rate': rate, 'description': description}
+                metric = {'rate': 1.0 / obj.get('interval', default_interval), 'description': description}
                 for metric_attr in additional_metric_attributes:
                     if metric_attr in obj:
                         metric[metric_attr] = obj[metric_attr]
@@ -217,7 +176,7 @@ class PduSource(metricq.IntervalSource):
 
         original_sigint_handler = signal.signal(
             signal.SIGINT, orig_sig_handler)
-        self.workers = mp.Pool(num_procs, do_work, (work, self.result_queue))
+        self.workers = mp.Pool(num_procs, mp_worker, (work, self.result_queue))
         signal.signal(signal.SIGINT, original_sigint_handler)
 
         # for signame in ["SIGINT", "SIGTERM"]:
