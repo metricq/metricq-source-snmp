@@ -3,7 +3,7 @@ from setuptools import setup
 setup(name='metricq_source_snmp',
       version='0.1',
       author='TU Dresden',
-      python_requires=">=3.5",
+      python_requires=">=3.7",
       packages=['metricq_source_snmp'],
       scripts=[],
       entry_points='''
