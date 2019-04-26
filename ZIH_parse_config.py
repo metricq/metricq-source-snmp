@@ -1,3 +1,8 @@
+#!/usr/bin/python3
+
+import json
+import click
+
 settings = {
    'default_community': 'pdumon',
    'default_interval': 5,
@@ -182,8 +187,44 @@ def read_pdu_csv():
 
 	return ips
 
-ips = read_pdu_csv()
-settings['hosts'] = ips
+def out_combinator(ips):
+   config = {}
+   racks = []
+   for host, host_cfg in ips.items():
+      rack = "{}.{}".format(settings['default_prefix'], host_cfg['infix'][:-1])
+      if not rack in racks:
+         racks.append(rack)
 
-import json
-print(json.dumps(settings, indent=2))
+         rack_cntr = "{}.B83.W".format(rack)
+         for side in ["A", "B"]:
+            config["{}{}.B83.W".format(rack, side)] = {
+               "operation": "+",
+               "left": {
+                  "operation": "+",
+                     "left": "{}{}.B83.W1".format(rack, side),
+                     "right": "{}{}.B83.W2".format(rack, side)
+               },
+               "right": "{}{}.B83.W3".format(rack, side)
+            }
+         config["{}.B83.W".format(rack)] = {
+            "operation": "+",
+            "left": "{}A.B83.W3".format(rack),
+            "right": "{}B.B83.W3".format(rack)
+         }
+   return config
+
+
+@click.command()
+@click.option('--combinator', default=False, is_flag=True)
+def main(combinator):
+   ips = read_pdu_csv()
+   if combinator:
+      print(json.dumps(out_combinator(ips), indent=2))
+   else: 
+     settings['hosts'] = ips
+     print(json.dumps(settings, indent=2))
+
+
+if __name__ == '__main__':
+   main()
+
