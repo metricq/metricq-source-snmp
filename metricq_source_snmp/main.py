@@ -34,7 +34,7 @@ async def get_one(snmp_engine, host, community_string, objects):
     errorIndication, errorStatus, errorIndex, varBinds = await getCmd(
         snmp_engine,
         CommunityData(community_string),
-        UdpTransportTarget(host, timeout=1.0, retries=4),
+        UdpTransportTarget(host, timeout=1.0, retries=3),
         ContextData(),
         *objs,
     )
@@ -43,7 +43,8 @@ async def get_one(snmp_engine, host, community_string, objects):
         logging.error(host, errorIndication)
         return
     elif errorStatus:
-        logging.error(host, '{} at {}'.format(errorStatus.prettyPrint(), errorIndex))
+        logging.error(host, '{} at {}'.format(
+            errorStatus.prettyPrint(), errorIndex))
         return
     else:
         ret = []
@@ -57,7 +58,8 @@ async def get_one(snmp_engine, host, community_string, objects):
                 metric_name, multi, interval = objects[obj_id]
                 ret.append((metric_name, ts, float(val) * multi))
             except Exception as e:
-                logging.error(host, "Invalid result: {} = {}".format(bindName, val))
+                logging.error(
+                    host, "Invalid result: {} = {}".format(bindName, val))
                 return []
         return ret
 
@@ -85,7 +87,6 @@ async def collect_periodically(work, result_queue, interval):
                 result_queue.put_nowait(r)
 
 
-
 async def do_work(input_queue, result_queue):
     work = input_queue.get()
     sorted_work = defaultdict(list)
@@ -96,10 +97,12 @@ async def do_work(input_queue, result_queue):
             sorted_objects[interval][obj_id] = obj_data
 
         for object_interval, object_data in sorted_objects.items():
-            sorted_work[object_interval].append((host, community_string, object_data))
+            sorted_work[object_interval].append(
+                (host, community_string, object_data))
     work_loops = []
     for work_interval, work_data in sorted_work.items():
-        work_loops.append(collect_periodically(work_data, result_queue, work_interval))
+        work_loops.append(collect_periodically(
+            work_data, result_queue, work_interval))
     await asyncio.wait(work_loops)
 
 
@@ -123,7 +126,7 @@ class PduSource(metricq.IntervalSource):
     @metricq.rpc_handler('config')
     async def _on_config(self, default_community, default_interval, default_prefix, default_object_collections,
                          additional_metric_attributes, snmp_object_collections, **config):
-        self.period = default_interval
+        self.period = 1
         metrics = {}  # holds metrics for declaration to metricq
 
         # key: ip, data: [(OID, metric-name, multi, interval), ...]
@@ -144,7 +147,8 @@ class PduSource(metricq.IntervalSource):
                     host_cfg['description'], obj['short_description'])
                 metric_name = "{}.{}.{}".format(
                     default_prefix, host_cfg['infix'], obj['suffix'])
-                metric = {'rate': 1.0 / obj.get('interval', default_interval), 'description': description}
+                metric = {
+                    'rate': 1.0 / obj.get('interval', default_interval), 'description': description}
                 for metric_attr in additional_metric_attributes:
                     if metric_attr in obj:
                         metric[metric_attr] = obj[metric_attr]
@@ -157,7 +161,8 @@ class PduSource(metricq.IntervalSource):
 
                 objects_by_host[host][obj_id] = (metric_name, multi, interval)
 
-        num_procs = min(config.get('num_procs', mp.cpu_count()), len(objects_by_host))
+        num_procs = min(config.get('num_procs', mp.cpu_count()),
+                        len(objects_by_host))
 
         chunked = chunks(list(objects_by_host.keys()), num_procs)
         work = mp.Queue()
