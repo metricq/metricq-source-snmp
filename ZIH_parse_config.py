@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from collections import OrderedDict
 import json
 import click
 
@@ -188,16 +189,15 @@ def read_pdu_csv():
 	return ips
 
 def out_combinator(ips):
-   config = {}
+   config = OrderedDict()
    racks = []
    for host, host_cfg in ips.items():
       rack = "{}.{}".format(settings['default_prefix'], host_cfg['infix'][:-1])
       if not rack in racks:
          racks.append(rack)
 
-         rack_cntr = "{}.B83.W".format(rack)
          for side in ["A", "B"]:
-            config["{}{}.B83.W".format(rack, side)] = {
+            expression = {
                "operation": "+",
                "left": {
                   "operation": "+",
@@ -206,11 +206,24 @@ def out_combinator(ips):
                },
                "right": "{}{}.B83.W3".format(rack, side)
             }
-         config["{}.B83.W".format(rack)] = {
+            metadata = {
+               "description": "Room {} Rack {} PDU {} Power".format(host_cfg['room'], host_cfg['rack'], side),
+               "display_expression": "({}{}.B83.W1 + {}{}.B83.W2 + {}{}.B83.W3)".format(rack, side, rack, side, rack, side),
+               "unit": "W",
+            }
+            config["{}{}.B83.W".format(rack, side)] = {"expression": expression, "metadata": metadata}
+
+         expression = {
             "operation": "+",
-            "left": "{}A.B83.W3".format(rack),
-            "right": "{}B.B83.W3".format(rack)
+            "left": "{}A.B83.W".format(rack),
+            "right": "{}B.B83.W".format(rack)
          }
+         metadata = {
+            "description": "Room {} Rack {} Total Power".format(host_cfg['room'], host_cfg['rack']),
+            "display_expression": "({}A.B83.W + {}B.B83.W)".format(rack, rack),
+            "unit": "W",
+         }
+         config["{}.B83.W".format(rack)] = {"expression": expression, "metadata": metadata}
    return config
 
 
