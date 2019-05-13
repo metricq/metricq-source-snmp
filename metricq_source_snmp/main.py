@@ -220,7 +220,7 @@ def run(server, token):
         with aiomonitor.start_monitor(src.event_loop, locals={'src': src}):
             src.run()  # catch_signals=())
     except KeyboardInterrupt:
-        print('Keyboard interrupt Exit Process')
+        print('Keyboard interrupt, exiting Process')
 
 
 if __name__ == "__main__":
