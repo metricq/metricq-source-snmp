@@ -25,7 +25,7 @@ logger.setLevel('ERROR')
 # logger.handlers[0].formatter = logging.Formatter(fmt='%(asctime)s %(threadName)-16s %(levelname)-8s %(message)s')
 logger.handlers[0].formatter = logging.Formatter(
     fmt='%(asctime)s [%(levelname)-8s] [%(name)-20s] %(message)s')
-orig_sig_handler = None
+orig_sig_handler = {}
 
 
 async def get_one(snmp_engine, host, community_string, objects):
@@ -105,7 +105,12 @@ async def do_work(input_queue, result_queue):
 
 def mp_worker(input_queue, result_queue):
     """init function of multiprocessing workers"""
-    asyncio.run(do_work(input_queue, result_queue))
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(do_work(input_queue, result_queue))
+        loop.run_forever()
+    except KeyboardInterrupt:
+        loop.stop()
 
 
 def chunks(lst, n):
@@ -173,13 +178,13 @@ class PduSource(metricq.IntervalSource):
             self.workers.terminate()
 
         original_sigint_handler = signal.signal(
-            signal.SIGINT, orig_sig_handler)
+            signal.SIGINT, orig_sig_handler['interrupt'])
+        original_sigterm_handler = signal.signal(
+            signal.SIGTERM, orig_sig_handler['terminate'])
+
         self.workers = mp.Pool(num_procs, mp_worker, (work, self.result_queue))
         signal.signal(signal.SIGINT, original_sigint_handler)
-
-        # for signame in ["SIGINT", "SIGTERM"]:
-        #   self.event_loop.add_signal_handler(getattr(signal, signame),
-        #     functools.partial(self.on_signal, signame))
+        signal.signal(signal.SIGTERM, original_sigterm_handler)
 
         logger.info("Declaring {} metrics...".format(len(metrics)))
         await self.declare_metrics(metrics)
@@ -208,11 +213,14 @@ class PduSource(metricq.IntervalSource):
 @click_log.simple_verbosity_option(logger)
 def run(server, token):
     global orig_sig_handler
-    orig_sig_handler = signal.getsignal(signal.SIGINT)
-
-    src = PduSource(token=token, management_url=server)
-    with aiomonitor.start_monitor(src.event_loop, locals={'src': src}):
-        src.run()  # catch_signals=())
+    orig_sig_handler['interrupt'] = signal.getsignal(signal.SIGINT)
+    orig_sig_handler['terminate'] = signal.getsignal(signal.SIGTERM)
+    try:
+        src = PduSource(token=token, management_url=server)
+        with aiomonitor.start_monitor(src.event_loop, locals={'src': src}):
+            src.run()  # catch_signals=())
+    except KeyboardInterrupt:
+        print('Keyboard interrupt Exit Process')
 
 
 if __name__ == "__main__":
