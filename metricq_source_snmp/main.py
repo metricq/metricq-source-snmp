@@ -103,7 +103,7 @@ async def do_work(input_queue, result_queue):
     for work_interval, work_data in sorted_work.items():
         work_loops.append(collect_periodically(
             work_data, result_queue, work_interval))
-    await asyncio.wait(work_loops)
+    await asyncio.gather(*work_loops)
 
 
 def mp_worker(input_queue, result_queue):
@@ -202,7 +202,10 @@ class PduSource(metricq.IntervalSource):
                 break
         ts_before = time.time()
         if send_metrics:
-            await asyncio.wait(send_metrics)
+            try:
+                await asyncio.gather(*send_metrics)
+            except Exception as e:
+                logger.error("Exception in send: {}".format(str(e)))
         logger.info("Send took {:.2f} seconds, count: {}".format(
             time.time() - ts_before, len(send_metrics)))
 
