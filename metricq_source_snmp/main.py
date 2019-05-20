@@ -78,10 +78,7 @@ async def collect_periodically(work, result_queue, interval):
         for host, community_string, objects in work:
             get_data.append(get_one(snmp_engine, (host, 161),
                                     community_string, objects))
-
         ret = await asyncio.gather(*get_data)
-
-        #print("Worker putting {} results into queue...".format(len(ret)))
         for r in ret:
             if r:
                 result_queue.put_nowait(r)
@@ -120,9 +117,9 @@ def chunks(lst, n):
     return [lst[i::n] for i in range(n)]
 
 
-class PduSource(metricq.IntervalSource):
+class SnmpSource(metricq.IntervalSource):
     def __init__(self, *args, **kwargs):
-        logger.info("initializing PduSource")
+        logger.info("initializing SnmpSource")
         super().__init__(*args, **kwargs)
         self.period = None
         self.workers = None
@@ -196,7 +193,6 @@ class PduSource(metricq.IntervalSource):
 
     async def update(self):
         send_metrics = []
-        #print(time.time(), self.result_queue.qsize())
         while True:
             try:
                 result_list = self.result_queue.get_nowait()
@@ -223,9 +219,9 @@ def run(server, token):
     orig_sig_handler['interrupt'] = signal.getsignal(signal.SIGINT)
     orig_sig_handler['terminate'] = signal.getsignal(signal.SIGTERM)
     try:
-        src = PduSource(token=token, management_url=server)
+        src = SnmpSource(token=token, management_url=server)
         with aiomonitor.start_monitor(src.event_loop, locals={'src': src}):
-            src.run()  # catch_signals=())
+            src.run()
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting process')
 
