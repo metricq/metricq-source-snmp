@@ -212,7 +212,6 @@ class PduSource(metricq.IntervalSource):
 @click.option('--token', default='source-py-snmp')
 @click_log.simple_verbosity_option(logger)
 def run(server, token):
-    global orig_sig_handler
     orig_sig_handler['interrupt'] = signal.getsignal(signal.SIGINT)
     orig_sig_handler['terminate'] = signal.getsignal(signal.SIGTERM)
     try:
