@@ -16,11 +16,12 @@ import metricq
 from pysnmp.hlapi.asyncio import getCmd, ObjectType, ObjectIdentity, CommunityData, ContextData, SnmpEngine, UdpTransportTarget
 from metricq.logging import get_logger
 
+NaN = float('nan')
+
 logger = get_logger()
 click_log.basic_config(logger)
 sh = logging.handlers.SysLogHandler(address='/dev/log')
 logger.addHandler(sh)
-logger.setLevel('ERROR')
 # Use this if we ever use threads
 # logger.handlers[0].formatter = logging.Formatter(fmt='%(asctime)s %(threadName)-16s %(levelname)-8s %(message)s')
 logger.handlers[0].formatter = logging.Formatter(
@@ -38,18 +39,16 @@ async def get_one(snmp_engine, host, community_string, objects):
         ContextData(),
         *objs,
     )
-
+    ts = metricq.Timestamp.now()
+    ret = []
     if errorIndication:
         logging.error(host, errorIndication)
-        return
+        ret = [(metric_name, ts, NaN) for metric_name, _, _ in objects.values()]
     elif errorStatus:
         logging.error(host, '{} at {}'.format(
             errorStatus.prettyPrint(), errorIndex))
-        return
+        ret = [(metric_name, ts, NaN) for metric_name, _, _ in objects.values()]
     else:
-        ret = []
-        ts = metricq.Timestamp.now()
-
         assert(len(varBinds) == len(objects))
 
         for bindName, val in varBinds:
@@ -60,8 +59,8 @@ async def get_one(snmp_engine, host, community_string, objects):
             except Exception as e:
                 logging.error(
                     host, "Invalid result: {} = {}".format(bindName, val))
-                return []
-        return ret
+                ret.append((metric_name, ts, NaN))
+    return ret
 
 
 async def collect_periodically(work, result_queue, interval):
@@ -105,10 +104,9 @@ async def do_work(input_queue, result_queue):
 
 def mp_worker(input_queue, result_queue):
     """init function of multiprocessing workers"""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
     try:
         loop.run_until_complete(do_work(input_queue, result_queue))
-        loop.run_forever()
     except KeyboardInterrupt:
         loop.stop()
 
