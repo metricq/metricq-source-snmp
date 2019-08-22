@@ -190,23 +190,23 @@ class SnmpSource(metricq.IntervalSource):
         await self.declare_metrics(metrics)
 
     async def update(self):
-        send_metrics = []
+        send_metric_count = 0
         while True:
             try:
                 result_list = self.result_queue.get_nowait()
                 for metric_name, ts, value in result_list:
                     #print(metric_name, ts, value)
-                    send_metrics.append(self[metric_name].send(ts, value))
+                    self[metric_name].append(ts, value)
+                    send_metric_count += 1
             except Empty:
                 break
         ts_before = time.time()
-        if send_metrics:
-            try:
-                await asyncio.gather(*send_metrics)
-            except Exception as e:
-                logger.error("Exception in send: {}".format(str(e)))
+        try:
+            await self.flush()
+        except Exception as e:
+            logger.error("Exception in send: {}".format(str(e)))
         logger.info("Send took {:.2f} seconds, count: {}".format(
-            time.time() - ts_before, len(send_metrics)))
+            time.time() - ts_before, send_metric_count))
 
 
 @click.command()
