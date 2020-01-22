@@ -29,6 +29,14 @@ logger.handlers[0].formatter = logging.Formatter(
 orig_sig_handler = {}
 
 
+def sorting_key_worker_result(result):
+    # result is a list of tuples
+    # timestamp is equal for all tuples and is the second element of the tuple
+    if len(result) >= 1:
+        return result[0][1]
+    return None
+
+
 async def get_one(snmp_engine, host, community_string, objects):
     objs = [ObjectType(ObjectIdentity(obj_id)) for obj_id in objects.keys()]
 
@@ -78,6 +86,7 @@ async def collect_periodically(work, result_queue, interval):
             get_data.append(get_one(snmp_engine, (host, 161),
                                     community_string, objects))
         ret = await asyncio.gather(*get_data)
+        ret.sort(key=sorting_key_worker_result)
         for r in ret:
             if r:
                 result_queue.put_nowait(r)
