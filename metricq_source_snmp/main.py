@@ -119,7 +119,6 @@ class SnmpSource(metricq.IntervalSource):
     def __init__(self, *args, **kwargs):
         logger.info("initializing SnmpSource")
         super().__init__(*args, **kwargs)
-        self.period = None
         self.workers = None
         self.result_queue = mp.Queue()
 
