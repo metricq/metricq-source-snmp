@@ -125,7 +125,7 @@ class SnmpSource(metricq.IntervalSource):
     @metricq.rpc_handler('config')
     async def _on_config(self, default_community, default_interval, default_prefix, default_object_collections,
                          additional_metric_attributes, snmp_object_collections, **config):
-        self.period = 1
+        self.period = metricq.Timedelta.from_s(1)
         metrics = {}  # holds metrics for declaration to metricq
 
         # key: ip, data: [(OID, metric-name, multi, interval), ...]
