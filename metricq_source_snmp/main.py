@@ -32,35 +32,43 @@ orig_sig_handler = {}
 async def get_one(snmp_engine, host, community_string, objects):
     objs = [ObjectType(ObjectIdentity(obj_id)) for obj_id in objects.keys()]
 
-    errorIndication, errorStatus, errorIndex, varBinds = await getCmd(
-        snmp_engine,
-        CommunityData(community_string),
-        UdpTransportTarget(host, timeout=1.0, retries=3),
-        ContextData(),
-        *objs,
-    )
-    ts = metricq.Timestamp.now()
-    ret = []
-    if errorIndication:
-        logging.error(host, errorIndication)
-        ret = [(metric_name, ts, NaN) for metric_name, _, _ in objects.values()]
-    elif errorStatus:
-        logging.error(host, '{} at {}'.format(
-            errorStatus.prettyPrint(), errorIndex))
-        ret = [(metric_name, ts, NaN) for metric_name, _, _ in objects.values()]
-    else:
-        assert(len(varBinds) == len(objects))
+    try:
+        errorIndication, errorStatus, errorIndex, varBinds = await getCmd(
+            snmp_engine,
+            CommunityData(community_string),
+            UdpTransportTarget(host, timeout=1.0, retries=3),
+            ContextData(),
+            *objs,
+        )
+       
+        ts = metricq.Timestamp.now()
 
-        for bindName, val in varBinds:
-            obj_id = ".{}".format(bindName)  # add "." in front
-            try:
-                metric_name, multi, interval = objects[obj_id]
-                ret.append((metric_name, ts, float(val) * multi))
-            except Exception as e:
-                logging.error(
-                    host, "Invalid result: {} = {}".format(bindName, val))
-                ret.append((metric_name, ts, NaN))
-    return ret
+        if errorIndication:
+            raise RuntimeError(errorIndication)
+
+        if errorStatus:
+            error_msg = errorStatus.prettyPrint()
+            raise RuntimeError(f'{error_msg} at {errorIndex}')
+
+    except Exception as e:
+        # ts might not be defined here, if getCmd had raised an exception
+        ts = metricq.Timestamp.now() 
+        logging.error(host, e)
+        return [(metric_name, ts, NaN) for metric_name, _, _ in objects.values()]
+
+    assert(len(varBinds) == len(objects))
+
+    data_points = []
+
+    for bindName, val in varBinds:
+        obj_id = f".{bindName}"
+        try:
+            metric_name, multi, interval = objects[obj_id]
+            data_points.append((metric_name, ts, float(val) * multi))
+        except Exception as e:
+            logging.error(host, f"Invalid result: {bindName} = {val}")
+            data_points.append((metric_name, ts, NaN))
+    return data_points
 
 
 async def collect_periodically(work, result_queue, interval):
@@ -146,8 +154,13 @@ class SnmpSource(metricq.IntervalSource):
                     host_cfg['description'], obj['short_description'])
                 metric_name = "{}.{}.{}".format(
                     default_prefix, host_cfg['infix'], obj['suffix'])
+                interval = obj.get('interval', default_interval)
+
                 metric = {
-                    'rate': 1.0 / obj.get('interval', default_interval), 'description': description}
+                    'rate': 1.0 / interval,
+                    'description': description
+                }
+
                 for metric_attr in additional_metric_attributes:
                     if metric_attr in obj:
                         metric[metric_attr] = obj[metric_attr]
@@ -155,7 +168,6 @@ class SnmpSource(metricq.IntervalSource):
                         metric[metric_attr] = host_cfg[metric_attr]
                 metrics[metric_name] = metric
 
-                interval = obj.get('interval', default_interval)
                 multi = obj.get('multiplier', 1.0)
 
                 objects_by_host[host][obj_id] = (metric_name, multi, interval)
