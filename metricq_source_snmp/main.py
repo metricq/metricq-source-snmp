@@ -20,8 +20,6 @@ NaN = float('nan')
 
 logger = get_logger()
 click_log.basic_config(logger)
-sh = logging.handlers.SysLogHandler()
-logger.addHandler(sh)
 # Use this if we ever use threads
 # logger.handlers[0].formatter = logging.Formatter(fmt='%(asctime)s %(threadName)-16s %(levelname)-8s %(message)s')
 logger.handlers[0].formatter = logging.Formatter(
