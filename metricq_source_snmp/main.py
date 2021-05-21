@@ -142,6 +142,8 @@ class SnmpSource(metricq.IntervalSource):
             community_by_host[host] = host_cfg.get(
                 'community', default_community)
 
+            host_interval = host_cfg.get('interval', default_interval)
+
             objs = {}
             obj_col_list = host_cfg.get('objects', default_object_collections)
             for obj_col in obj_col_list:
@@ -152,7 +154,7 @@ class SnmpSource(metricq.IntervalSource):
                     host_cfg['description'], obj['short_description'])
                 metric_name = "{}.{}.{}".format(
                     default_prefix, host_cfg['infix'], obj['suffix'])
-                interval = obj.get('interval', default_interval)
+                interval = obj.get('interval', host_interval)
 
                 metric = {
                     'rate': 1.0 / interval,
