@@ -10,5 +10,5 @@ setup(name='metricq_source_snmp',
       [console_scripts]
       metricq-source-snmp=metricq_source_snmp:run
       ''',
-    install_requires=["aiomonitor", "click", "click_log", "metricq ~= 2.0", "pysnmp"],
+    install_requires=["aiomonitor", "click", "click_log", "metricq ~= 3.0", "pysnmp"],
 )
