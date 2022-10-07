@@ -229,7 +229,8 @@ def run(server, token):
     orig_sig_handler['terminate'] = signal.getsignal(signal.SIGTERM)
     try:
         src = SnmpSource(token=token, management_url=server)
-        with aiomonitor.start_monitor(src.event_loop, locals={'src': src}):
+        loop = asyncio.get_event_loop()
+        with aiomonitor.start_monitor(loop=loop, locals={'src': src}):
             src.run()
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting process')
