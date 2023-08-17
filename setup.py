@@ -15,7 +15,7 @@ setup(
         "aiomonitor",
         "click",
         "click_log",
-        "metricq ~= 4.0",
+        "metricq ~= 5.3",
         "pysnmp-lextudio",
     ],
 )
