@@ -105,7 +105,7 @@ async def get_one(
                 f"Unexpected result for {host}, didn't requested that: {bindName} = {val}"
             )
         except Exception as e:
-            logger.error(f"Invalid result for {host}: {bindName} = {val}")
+            logger.error(f"Invalid result for {host}: {bindName} = {val}: {e}")
             data_points.append((metric, ts, NaN))
     return data_points
 
