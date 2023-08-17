@@ -3,19 +3,22 @@ import asyncio
 import logging
 import logging.handlers
 import multiprocessing as mp
+import queue
 import sys
+import threading
 import time
 import traceback
+from collections.abc import Awaitable
 from itertools import tee
 from collections import defaultdict
 from queue import Empty
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, Mapping
 
 import click
-import click_log
+import click_log  # type: ignore
 import metricq
 from metricq.logging import get_logger
-from pysnmp.hlapi.asyncio import (
+from pysnmp.hlapi.asyncio import (  # type: ignore
     CommunityData,
     ContextData,
     ObjectIdentity,
@@ -59,7 +62,7 @@ async def get_one(
     objs = [ObjectType(ObjectIdentity(obj_id)) for obj_id in objects.keys()]
 
     try:
-        result: tuple[str, str, int, Sequence[Any]] = await getCmd(
+        result: Awaitable[tuple[str, str, int, Sequence[Any]]] = await getCmd(
             snmp_engine,
             CommunityData(community),
             UdpTransportTarget(host, timeout=1.0, retries=3),
@@ -112,8 +115,8 @@ async def get_one(
 
 async def collect_periodically(
     configurations: list[HostConfig],
-    stop_event: "mp.Event",
-    result_queue: "mp.Queue[list[DataPoint]]",
+    stop_event: threading.Event,
+    result_queue: queue.Queue[list[DataPoint]],
     interval: float,
 ) -> None:
     snmp_engine = SnmpEngine()
@@ -146,17 +149,17 @@ async def collect_periodically(
 
 async def start_collectors(
     host_config: list[HostConfig],
-    stop_event: "mp.Event",
-    result_queue: "mp.Queue[list[DataPoint]]",
+    stop_event: threading.Event,
+    result_queue: queue.Queue[list[DataPoint]],
 ) -> None:
     """main work loop of worker processes
 
     This function is called by the multiprocessing workers.
     """
-    grouped_host_configs: dict[float, HostConfig] = defaultdict(list)
+    grouped_host_configs: Mapping[float, list[HostConfig]] = defaultdict(list)
 
     for host, community, objects in host_config:
-        grouped_by_interval: dict[float, HostObjectConfig] = defaultdict(dict)
+        grouped_by_interval: Mapping[float, HostObjectConfig] = defaultdict(dict)
 
         for id, config in objects.items():
             _, _, interval = config
@@ -175,8 +178,8 @@ async def start_collectors(
 
 def mp_worker(
     host_config: list[HostConfig],
-    stop_event: "mp.Event",
-    result_queue: "mp.Queue[list[DataPoint]]",
+    stop_event: threading.Event,
+    result_queue: queue.Queue[list[DataPoint]],
 ) -> None:
     """init function of multiprocessing workers"""
     logger.debug("Starting worker process event loop")
@@ -190,8 +193,8 @@ class SnmpSource(metricq.IntervalSource):
         super().__init__(*args, **kwargs)
         self.workers: Optional[mp.pool.Pool] = None
         manager = mp.Manager()
-        self.result_queue: "mp.Queue[list[DataPoint]]" = manager.Queue()
-        self.stop_event: "mp.Event" = manager.Event()
+        self.result_queue: queue.Queue[list[DataPoint]] = manager.Queue()
+        self.stop_event: threading.Event = manager.Event()
 
     @metricq.rpc_handler("config")
     async def _on_config(
@@ -316,7 +319,7 @@ class SnmpSource(metricq.IntervalSource):
             )
         )
 
-    def on_signal(self, signal):
+    def on_signal(self, signal: str) -> None:
         try:
             logger.info("Received signal {}".format(signal))
             if self.workers:
@@ -335,7 +338,7 @@ class SnmpSource(metricq.IntervalSource):
 @click.command()
 @click.option("--server", default="amqp://localhost/")
 @click.option("--token", default="source-py-snmp")
-@click_log.simple_verbosity_option(logger)
+@click_log.simple_verbosity_option(logger)  # type: ignore
 def run(server: str, token: str) -> None:
     src = SnmpSource(token=token, management_url=server)
     src.run()
