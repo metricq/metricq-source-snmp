@@ -17,5 +17,6 @@ setup(
         "click_log",
         "metricq ~= 5.3",
         "pysnmp-lextudio",
+        "uvloop",
     ],
 )
