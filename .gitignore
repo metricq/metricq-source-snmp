@@ -103,4 +103,4 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-metricq_source_snmp/config.py
+metricq_source_snmp/version.py

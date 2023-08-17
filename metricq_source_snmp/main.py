@@ -27,6 +27,8 @@ from pysnmp.hlapi.asyncio import (
     getCmd,
 )
 
+from .version import __version__  # noqa: F401 # magic import for automatic version
+
 NaN = float("nan")
 
 logger = get_logger("SnmpSource")
