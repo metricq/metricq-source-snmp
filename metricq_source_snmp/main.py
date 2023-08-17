@@ -1,6 +1,5 @@
 #!/usr/bin/python
 import asyncio
-import logging
 import logging.handlers
 import multiprocessing as mp
 import queue
@@ -8,18 +7,18 @@ import sys
 import threading
 import time
 import traceback
+from collections import defaultdict
 from collections.abc import Awaitable
 from itertools import tee
-from collections import defaultdict
 from queue import Empty
-from typing import Any, Optional, Sequence, Mapping
+from typing import Any, Mapping, Optional, Sequence
 
 import click
 import click_log  # type: ignore
 import metricq
 from metricq.logging import get_logger
-from pysnmp.hlapi.asyncio import (  # type: ignore
-    CommunityData,
+from pysnmp.hlapi.asyncio import CommunityData  # type: ignore
+from pysnmp.hlapi.asyncio import (
     ContextData,
     ObjectIdentity,
     ObjectType,
