@@ -22,6 +22,8 @@ snmp_object_collections:
         suffix : 'B83.WA'
         unit : 'W'
         description : 'Power Circuit A'
+        multiplier: 0.001
+        absolute: true
 
    temperature_sensor:
      '.1.3.6.1.4.1.476.1.42.3.8.60.15.1.70.1.1.1': 

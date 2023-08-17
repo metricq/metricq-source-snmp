@@ -46,7 +46,7 @@ Hostname = str
 Community = str
 HostnamePort = tuple[Hostname, int]
 OID = str
-ObjectConfig = tuple[Metric, float, int]
+ObjectConfig = tuple[Metric, float, bool, int]
 HostObjectConfig = dict[OID, ObjectConfig]
 HostConfig = tuple[Hostname, Community, HostObjectConfig]
 
@@ -93,7 +93,7 @@ async def get_one(
         logger.error(
             f"Failed to get from {host}: {str(e)}\n{''.join(traceback.format_exception(e))}"
         )
-        return [(metric, ts, NaN) for metric, _, _ in objects.values()]
+        return [(metric, ts, NaN) for metric, _, _, _ in objects.values()]
 
     assert len(varBinds) == len(objects)
 
@@ -102,8 +102,11 @@ async def get_one(
     for bindName, val in varBinds:
         obj_id = f".{bindName}"
         try:
-            metric, multiplier, _ = objects[obj_id]
-            data_points.append((metric, ts, float(val) * multiplier))
+            metric, multiplier, absolute, _ = objects[obj_id]
+            val = float(val) * multiplier
+            if absolute:
+                val = abs(val)
+            data_points.append((metric, ts, val))
         except KeyError as e:
             logger.error(
                 f"Unexpected result for {host}, didn't requested that: {bindName} = {val}"
@@ -163,7 +166,7 @@ async def start_collectors(
         grouped_by_interval: Mapping[float, HostObjectConfig] = defaultdict(dict)
 
         for id, config in objects.items():
-            _, _, interval = config
+            _, _, _, interval = config
             grouped_by_interval[interval][id] = config
 
         for object_interval, object_data in grouped_by_interval.items():
@@ -251,6 +254,7 @@ class SnmpSource(metricq.IntervalSource):
                 objects_by_host[host][oid] = (
                     metric,
                     object.get("multiplier", 1.0),
+                    object.get("absolute", False),
                     interval,
                 )
 
