@@ -1,4 +1,4 @@
-FROM ghcr.io/metricq/metricq-python:v4.2 AS builder
+FROM ghcr.io/metricq/metricq-python:v5.3 AS builder
 LABEL maintainer="mario.bielert@tu-dresden.de"
 
 USER root
@@ -14,7 +14,7 @@ COPY --chown=metricq:metricq . /home/metricq/source-snmp
 WORKDIR /home/metricq/source-snmp
 RUN pip install --user .
 
-FROM ghcr.io/metricq/metricq-python:v4.2
+FROM ghcr.io/metricq/metricq-python:v5.3
 
 USER metricq
 COPY --from=BUILDER --chown=metricq:metricq /home/metricq/.local /home/metricq/.local

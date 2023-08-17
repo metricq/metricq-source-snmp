@@ -15,7 +15,13 @@ setup(
         "aiomonitor",
         "click",
         "click_log",
-        "metricq ~= 4.0",
+        "metricq ~= 5.3",
         "pysnmp-lextudio",
+        "uvloop",
     ],
+    use_scm_version={
+        "write_to": "metricq_source_snmp/version.py",
+        "relative_to": __file__,
+    },
+    setup_requires=["setuptools_scm"],
 )
