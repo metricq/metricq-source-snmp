@@ -9,7 +9,7 @@ import time
 import traceback
 from collections import defaultdict
 from collections.abc import Awaitable
-from itertools import tee
+from itertools import islice
 from queue import Empty
 from typing import Any, Mapping, Optional, Sequence
 
@@ -28,6 +28,17 @@ from pysnmp.hlapi.asyncio import (
 )
 
 from .version import __version__  # noqa: F401 # magic import for automatic version
+
+
+# Patiently waiting for Python 3.12 to import this diretly
+def batched(iterable, n):
+    # batched('ABCDEFG', 3) --> ABC DEF G
+    if n < 1:
+        raise ValueError("n must be at least one")
+    it = iter(iterable)
+    while batch := tuple(islice(it, n)):
+        yield batch
+
 
 NaN = float("nan")
 
@@ -284,7 +295,7 @@ class SnmpSource(metricq.IntervalSource):
         )
 
         # distribute host configurations to workers
-        for chunk in tee(objects_by_host.keys(), num_procs):
+        for chunk in batched(objects_by_host.keys(), num_procs):
             self.workers.apply_async(
                 mp_worker,
                 (
