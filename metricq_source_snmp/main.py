@@ -31,14 +31,10 @@ from pysnmp.hlapi.asyncio import (
 from .version import __version__  # noqa: F401 # magic import for automatic version
 
 
-# Patiently waiting for Python 3.12 to import this diretly
-def batched(iterable, n):
-    # batched('ABCDEFG', 3) --> ABC DEF G
-    if n < 1:
-        raise ValueError("n must be at least one")
-    it = iter(iterable)
-    while batch := tuple(islice(it, n)):
-        yield batch
+# https://stackoverflow.com/a/2135920
+def split(a, n):
+    k, m = divmod(len(a), n)
+    return (a[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)] for i in range(n))
 
 
 NaN = float("nan")
@@ -307,7 +303,7 @@ class SnmpSource(metricq.IntervalSource):
         )
 
         # distribute host configurations to workers
-        for chunk in batched(objects_by_host.keys(), num_procs):
+        for chunk in split(objects_by_host.keys(), num_procs):
             self.workers.apply_async(
                 mp_worker,
                 (
