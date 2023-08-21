@@ -10,9 +10,9 @@ import time
 import traceback
 from collections import defaultdict
 from collections.abc import Awaitable
-from itertools import islice
+
 from queue import Empty
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence, TypeVar, Iterable
 
 import click
 import click_log  # type: ignore
@@ -31,8 +31,11 @@ from pysnmp.hlapi.asyncio import (
 from .version import __version__  # noqa: F401 # magic import for automatic version
 
 
+T = TypeVar("T")
+
+
 # https://stackoverflow.com/a/2135920
-def split(a, n):
+def split(a: list[T], n: int) -> Iterable[list[T]]:
     k, m = divmod(len(a), n)
     return (a[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)] for i in range(n))
 
@@ -303,7 +306,7 @@ class SnmpSource(metricq.IntervalSource):
         )
 
         # distribute host configurations to workers
-        for chunk in split(objects_by_host.keys(), num_procs):
+        for chunk in split(list(objects_by_host.keys()), num_procs):
             self.workers.apply_async(
                 mp_worker,
                 (
