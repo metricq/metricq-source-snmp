@@ -2,6 +2,7 @@
 import asyncio
 import logging.handlers
 import multiprocessing as mp
+import os
 import queue
 import sys
 import threading
@@ -171,10 +172,10 @@ async def start_collectors(
 
     This function is called by the multiprocessing workers.
     """
-    grouped_host_configs: Mapping[float, list[HostConfig]] = defaultdict(list)
+    grouped_host_configs: Mapping[int, list[HostConfig]] = defaultdict(list)
 
     for host, community, objects in host_config:
-        grouped_by_interval: Mapping[float, HostObjectConfig] = defaultdict(dict)
+        grouped_by_interval: Mapping[int, HostObjectConfig] = defaultdict(dict)
 
         for id, config in objects.items():
             _, _, _, interval = config
@@ -182,6 +183,13 @@ async def start_collectors(
 
         for object_interval, object_data in grouped_by_interval.items():
             grouped_host_configs[object_interval].append((host, community, object_data))
+
+    for interval, host_configs in grouped_host_configs.items():
+        n_metrics = sum([len(object_data) for _, _, object_data in host_configs])
+        logger.info(
+            f"[worker {os.getpid()}] interval {interval}s: "
+            f"{len(host_configs)} hosts, {n_metrics} metrics"
+        )
 
     await asyncio.gather(
         *[
@@ -197,9 +205,9 @@ def mp_worker(
     result_queue: queue.Queue[list[DataPoint]],
 ) -> None:
     """init function of multiprocessing workers"""
-    logger.debug("Starting worker process event loop")
+    logger.debug(f"[worker {os.getpid()}] Starting event loop")
     asyncio.run(start_collectors(host_config, stop_event, result_queue))
-    logger.debug("Worker process exited event loop")
+    logger.debug(f"[worker {os.getpid()}] exited event loop")
 
 
 class SnmpSource(metricq.IntervalSource):
