@@ -205,6 +205,10 @@ def mp_worker(
     result_queue: queue.Queue[list[DataPoint]],
 ) -> None:
     """init function of multiprocessing workers"""
+    # overwrite logger with multiprocessing logger
+    global logger
+    # Unfortunately no way to configure easily, but there shouldn't be much debug spam here...
+    logger = mp.log_to_stderr(logging.DEBUG)
     logger.debug(f"[worker {os.getpid()}] Starting event loop")
     asyncio.run(start_collectors(host_config, stop_event, result_queue))
     logger.debug(f"[worker {os.getpid()}] exited event loop")
