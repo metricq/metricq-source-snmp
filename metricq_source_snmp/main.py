@@ -10,14 +10,16 @@ import time
 import traceback
 from collections import defaultdict
 from collections.abc import Awaitable
-
 from queue import Empty
-from typing import Any, Mapping, Optional, Sequence, TypeVar, Iterable
+from typing import Any, Iterable, Mapping, Optional, Sequence, TypeVar
 
 import click
 import click_log  # type: ignore
 import metricq
+from metricq import Timedelta
+from metricq.cli import metricq_command, DurationParam
 from metricq.logging import get_logger
+from click import option
 from pysnmp.hlapi.asyncio import CommunityData  # type: ignore
 from pysnmp.hlapi.asyncio import (
     ContextData,
@@ -30,9 +32,10 @@ from pysnmp.hlapi.asyncio import (
 
 from .version import __version__  # noqa: F401 # magic import for automatic version
 
-
 T = TypeVar("T")
 
+global_timeout = 1.0
+TIMEOUT = DurationParam(default=Timedelta.from_s(global_timeout))
 
 # https://stackoverflow.com/a/2135920
 def split(a: list[T], n: int) -> Iterable[list[T]]:
@@ -77,7 +80,7 @@ async def get_one(
         result: Awaitable[tuple[str, str, int, Sequence[Any]]] = await getCmd(
             snmp_engine,
             CommunityData(community),
-            UdpTransportTarget(host, timeout=1.0, retries=3),
+            UdpTransportTarget(host, timeout=global_timeout, retries=3),
             ContextData(),
             *objs,
         )
@@ -362,11 +365,18 @@ class SnmpSource(metricq.IntervalSource):
             super().on_signal(signal)
 
 
-@click.command()
-@click.option("--server", default="amqp://localhost/")
-@click.option("--token", default="source-py-snmp")
-@click_log.simple_verbosity_option(logger)  # type: ignore
-def run(server: str, token: str) -> None:
+@metricq_command(default_token="snmp-source")
+@option(
+    "--timeout",
+    type=TIMEOUT,
+    default=TIMEOUT.default,
+    help="A timeout for the program",
+    show_default=True,
+)
+def run(server: str, token: str, timeout: Timedelta) -> None:
+    global global_timeout
+    global_timeout = timeout.s
+
     src = SnmpSource(token=token, management_url=server)
     src.run()
 
