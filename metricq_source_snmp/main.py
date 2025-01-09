@@ -10,13 +10,13 @@ import time
 import traceback
 from collections import defaultdict
 from collections.abc import Awaitable
-
 from queue import Empty
-from typing import Any, Mapping, Optional, Sequence, TypeVar, Iterable
+from typing import Any, Iterable, Mapping, Optional, Sequence, TypeVar
 
 import click
 import click_log  # type: ignore
 import metricq
+from metricq.cli import metricq_command
 from metricq.logging import get_logger
 from pysnmp.hlapi.asyncio import CommunityData  # type: ignore
 from pysnmp.hlapi.asyncio import (
@@ -29,7 +29,6 @@ from pysnmp.hlapi.asyncio import (
 )
 
 from .version import __version__  # noqa: F401 # magic import for automatic version
-
 
 T = TypeVar("T")
 
@@ -362,10 +361,7 @@ class SnmpSource(metricq.IntervalSource):
             super().on_signal(signal)
 
 
-@click.command()
-@click.option("--server", default="amqp://localhost/")
-@click.option("--token", default="source-py-snmp")
-@click_log.simple_verbosity_option(logger)  # type: ignore
+@metricq_command(default_token="snmp-source")
 def run(server: str, token: str) -> None:
     src = SnmpSource(token=token, management_url=server)
     src.run()
