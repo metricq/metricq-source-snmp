@@ -2,7 +2,6 @@ from setuptools import setup
 
 setup(
     name="metricq_source_snmp",
-    version="0.3",
     author="TU Dresden",
     python_requires=">=3.10",
     packages=["metricq_source_snmp"],
@@ -15,7 +14,7 @@ setup(
         "aiomonitor",
         "click",
         "click_log",
-        "metricq ~= 5.3",
+        "metricq ~= 6.0",
         "pysnmp-lextudio",
         "uvloop",
     ],

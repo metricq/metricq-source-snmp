@@ -1,22 +1,29 @@
-FROM ghcr.io/metricq/metricq-python:v5.3 AS builder
+FROM python:3.13-slim-trixie AS builder
 LABEL maintainer="mario.bielert@tu-dresden.de"
 
-USER root
-USER root
 RUN apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     git \
-    && rm -rf /var/lib/apt/lists/* 
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+COPY . /src
+WORKDIR /src
+
+RUN pip install --no-cache-dir '.'
+
+
+FROM python:3.13-slim-trixie
+LABEL maintainer="mario.bielert@tu-dresden.de"
+
+RUN useradd -m metricq
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
 
 USER metricq
-COPY --chown=metricq:metricq . /home/metricq/source-snmp
+WORKDIR /home/metricq
 
-WORKDIR /home/metricq/source-snmp
-RUN pip install --user .
-
-FROM ghcr.io/metricq/metricq-python:v5.3
-
-USER metricq
-COPY --from=BUILDER --chown=metricq:metricq /home/metricq/.local /home/metricq/.local
-
-ENTRYPOINT [ "/home/metricq/.local/bin/metricq-source-snmp" ]
+ENTRYPOINT [ "metricq-source-snmp" ]
