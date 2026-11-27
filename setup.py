@@ -14,7 +14,7 @@ setup(
         "aiomonitor",
         "click",
         "click_log",
-        "metricq ~= 5.3",
+        "metricq ~= 6.0",
         "pysnmp-lextudio",
         "uvloop",
     ],
